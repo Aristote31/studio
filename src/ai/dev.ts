@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/supplement-revision-points.ts';
+import '@/ai/flows/extract-revision-points.ts';
