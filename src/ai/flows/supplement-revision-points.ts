@@ -17,7 +17,7 @@ const SupplementRevisionPointsInputSchema = z.object({
   topic: z.string().describe('The topic of the revision sheet.'),
   revisionPoints: z
     .string()
-    .describe('A single string containing the key revision points, formatted with Markdown headings (e.g., "## Point Title\\n\\n## Another Point..."). Each point is typically just a heading. This string is the combined output of a previous extraction step.'),
+    .describe('A single string containing the key revision point titles, each formatted as a Markdown heading (e.g., "## Point Title\\n\\n## Another Point Title..."). Each point is just a title/heading. This string is the combined output of a previous extraction step.'),
   language: z
     .enum(['en', 'de', 'fr'])
     .describe('The language of the revision sheet.'),
@@ -50,25 +50,31 @@ Your task is to generate the content for the 'supplementedPoints' field.
 The content for 'supplementedPoints' MUST be a single string of well-formatted Markdown.
 This Markdown string will contain expanded explanations for revision points.
 
-The input '{{{revisionPoints}}}' provides the initial points as a single string, where each point starts with a Markdown heading like '## Point Title'.
+The input '{{{revisionPoints}}}' provides the initial point titles as a single string, where each point title starts with a Markdown heading like '## Point Title'.
 
-For each point starting with '## ' in the '{{{revisionPoints}}}' input string:
+For each point title starting with '## ' in the '{{{revisionPoints}}}' input string:
 1.  Take the title (the text after '## ').
 2.  Expand on this title by providing detailed definitions, clear explanations, and illustrative examples related to it.
 3.  Format your expansion for this point starting with the original '## Point Title' Markdown heading, followed by your detailed content.
 
 RULES FOR THE CONTENT OF THE 'supplementedPoints' FIELD:
 - The content MUST be ONLY Markdown text.
-- Use standard Markdown for formatting (headings, paragraphs, lists, bold, italics). **Ensure asterisks or other Markdown characters are used correctly for emphasis (e.g., \`**bold text**\`, \`*italic text*\`) and are NOT placed randomly between words or in ways that break formatting (e.g., NO "word * word" or isolated asterisks).**
+- Use standard Markdown for formatting:
+    - Headings: Start with '## ' for main section titles.
+    - Paragraphs: Standard text.
+    - Lists: Use asterisks ('* '), hyphens ('- '), or numbers ('1. ') followed by a space for list items.
+    - Bold text: Use double asterisks, e.g., \`**bold text**\`.
+    - Italic text: Use single asterisks, e.g., \`*italic text*\`.
+- **CRITICAL: Ensure Markdown emphasis characters (\`*\`, \`_\`) are used correctly and are NOT left as stray characters between words, at the beginning/end of unformatted text, or used incorrectly in lists. For example, DO NOT produce \`some * text\`, \`text *\`, or \`* List item with misplaced asterisk\`. Correct usage is \`*italic text*\`, \`**bold text**\`, and \`* List item\` (with a space after the asterisk for lists).**
 - ABSOLUTELY NO JSON structures, keys (like "topic", "points", "point", "title", "summary"), or array-like syntax (square brackets, commas separating items as if in an array) should appear within the Markdown text.
-- The Markdown text should be a continuous flow of headings (##) and paragraphs.
+- The Markdown text should be a continuous flow of headings (##) and paragraphs/lists.
 
 Topic (for context only, do not include in the output): {{topic}}
 
-Initial Revision Points string (each starting with '## '):
+Initial Revision Point Titles string (each starting with '## '):
 {{{revisionPoints}}}
 
-Example of how ONE point from the '{{{revisionPoints}}}' input string is expanded in your Markdown output:
+Example of how ONE point title from the '{{{revisionPoints}}}' input string is expanded in your Markdown output:
 If a line in '{{{revisionPoints}}}' is:
 ## Photosynthesis
 
@@ -90,10 +96,10 @@ Photosynthesis is the fundamental process by which green plants, algae, and some
 - Forms the base of most food chains by producing organic compounds from inorganic materials.
 - Plays a key role in regulating Earth's atmospheric composition.
 
-Now, process ALL the points provided in the '{{{revisionPoints}}}' input string in this manner.
+Now, process ALL the point titles provided in the '{{{revisionPoints}}}' input string in this manner.
 Combine your supplemented explanations for all points into a single, flowing Markdown text to be used as the value for the 'supplementedPoints' field.
 Ensure the entire output for 'supplementedPoints' is in {{language}} and strictly adheres to the Markdown-only rule.
-**Critically, ensure that Markdown emphasis (like asterisks for bold/italics) is applied correctly and does not result in stray asterisks between words or in unformatted text. The output must be clean and directly readable as Markdown.**
+**Critically, ensure that Markdown emphasis (like asterisks for bold/italics) and list formatting are applied correctly and do not result in stray asterisks or broken formatting. The output must be clean and directly readable as Markdown.**
 
 Begin generating the Markdown content for 'supplementedPoints' now:
 `,
@@ -124,8 +130,8 @@ const supplementRevisionPointsFlow = ai.defineFlow(
           cleanedOutput = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
       }
 
-      // Attempt to clean up stray asterisks surrounded by spaces, e.g. "word * word" -> "word word"
-      cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
+      // Removed simplistic asterisk cleanup: cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
+      // Relying on improved prompt for correct Markdown generation.
 
       return { supplementedPoints: cleanedOutput };
     } catch (error: any) {

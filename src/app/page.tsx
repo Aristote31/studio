@@ -38,19 +38,15 @@ export default function RevisioPage() {
     setRevisionData(null); // Clear previous data
 
     try {
-      let contentToProcess: string;
+      let extractionInput: ExtractRevisionPointsInput;
+
       if (formData.inputType === 'image' && imageAsDataUrl) {
-        contentToProcess = imageAsDataUrl;
+        extractionInput = { imageDataUri: imageAsDataUrl, language: formData.language };
       } else if (formData.inputType === 'text' && formData.textContent) {
-        contentToProcess = formData.textContent;
+        extractionInput = { textContent: formData.textContent, language: formData.language };
       } else {
         throw new Error("Contenu invalide. Veuillez fournir du texte ou une image.");
       }
-
-      const extractionInput: ExtractRevisionPointsInput = {
-        content: contentToProcess,
-        language: formData.language,
-      };
       
       toast({
         title: "Étape 1/2: Extraction des points clés...",
@@ -63,7 +59,7 @@ export default function RevisioPage() {
       }
 
       const revisionPointsString = extractedOutput.revisionPoints
-        .map(p => `## ${p.title}\n${p.summary}`)
+        .map(p => `## ${p.title}`) // Simpler format for supplementation input
         .join('\n\n');
 
       const supplementationInput: SupplementRevisionPointsInput = {

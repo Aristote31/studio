@@ -12,9 +12,14 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ExtractRevisionPointsInputSchema = z.object({
-  content: z.string().describe('The text or data URI of the image content to extract revision points from.'),
+  textContent: z.string().optional().describe('The text content to extract revision points from.'),
+  imageDataUri: z.string().optional().describe("A data URI of the image content to extract revision points from. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   language: z.enum(['en', 'de', 'fr']).describe('The language of the revision sheet.'),
+}).refine(data => data.textContent || data.imageDataUri, {
+  message: "Either textContent or imageDataUri must be provided.",
+  path: ["textContent"], // Or path: ["imageDataUri"], path of the error
 });
+
 export type ExtractRevisionPointsInput = z.infer<typeof ExtractRevisionPointsInputSchema>;
 
 const ExtractRevisionPointsOutputSchema = z.object({
@@ -37,14 +42,23 @@ const prompt = ai.definePrompt({
   output: {schema: ExtractRevisionPointsOutputSchema},
   prompt: `You are an expert at extracting key concepts and information from various types of content to create concise and effective revision sheets.
 
-  Analyze the following content and extract the most important revision points. Each revision point should include a title and a short summary.
+  Analyze the provided content and extract the most important revision points. Each revision point should include a title and a short summary.
   The revision sheet should be in the language specified by the user.
 
-  Content: {{content}}
-  Language: {{language}}
+  {{#if textContent}}
+  The content to analyze is the following text:
+  {{{textContent}}}
+  {{/if}}
+
+  {{#if imageDataUri}}
+  The content to analyze is the following image. Extract text, concepts, and key information visible in the image:
+  {{media url=imageDataUri}}
+  {{/if}}
+
+  Language for the output: {{language}}
 
   Your output should be a list of revision points, where each point has a title and a short summary.
-  Make sure the output is in the language: {{language}}
+  Make sure the output is in the language: {{language}}.
   `,
 });
 
