@@ -59,6 +59,7 @@ For each point starting with '## ' in the '{{{revisionPoints}}}' input string:
 
 RULES FOR THE CONTENT OF THE 'supplementedPoints' FIELD:
 - The content MUST be ONLY Markdown text.
+- Use standard Markdown for formatting (headings, paragraphs, lists, bold, italics). **Avoid placing asterisks or other Markdown characters randomly between words or in ways that break formatting.** Emphasize text correctly (e.g., \`**bold text**\`, \`*italic text*\`). Do NOT produce output like "word * word" or isolated asterisks.
 - ABSOLUTELY NO JSON structures, keys (like "topic", "points", "point", "title", "summary"), or array-like syntax (square brackets, commas separating items as if in an array) should appear within the Markdown text.
 - The Markdown text should be a continuous flow of headings (##) and paragraphs.
 
@@ -92,6 +93,7 @@ Photosynthesis is the fundamental process by which green plants, algae, and some
 Now, process ALL the points provided in the '{{{revisionPoints}}}' input string in this manner.
 Combine your supplemented explanations for all points into a single, flowing Markdown text to be used as the value for the 'supplementedPoints' field.
 Ensure the entire output for 'supplementedPoints' is in {{language}} and strictly adheres to the Markdown-only rule.
+**Critically, ensure that Markdown emphasis (like asterisks for bold/italics) is applied correctly and does not result in stray asterisks between words or in unformatted text. The output must be clean and directly readable as Markdown.**
 
 Begin generating the Markdown content for 'supplementedPoints' now:
 `,
@@ -111,16 +113,18 @@ const supplementRevisionPointsFlow = ai.defineFlow(
     }
     
     let cleanedOutput = output.supplementedPoints;
-    // More targeted cleanup for the specific reported issue, as a fallback.
-    // This attempts to remove the problematic JSON-like fragments if the LLM still includes them.
-    // Ideally, the prompt improvements should prevent this.
+    // Attempt to remove problematic JSON-like fragments if the LLM still includes them.
     cleanedOutput = cleanedOutput.replace(/,\s*"points":\s*\[{"point":/g, ''); 
     cleanedOutput = cleanedOutput.replace(/\[{"topic":\s*".*?",\s*"points":\s*\[{"point":/g, '');
+    
     // Attempt to clean up if the LLM wraps the response in a JSON structure for supplementedPoints
     const match = cleanedOutput.match(/^\{\s*"supplementedPoints"\s*:\s*"(.*)"\s*\}$/s);
     if (match && match[1]) {
         cleanedOutput = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
     }
+
+    // Attempt to clean up stray asterisks surrounded by spaces, e.g. "word * word" -> "word word"
+    cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
 
     return { supplementedPoints: cleanedOutput };
   }
