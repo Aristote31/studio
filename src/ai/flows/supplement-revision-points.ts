@@ -59,7 +59,7 @@ For each point starting with '## ' in the '{{{revisionPoints}}}' input string:
 
 RULES FOR THE CONTENT OF THE 'supplementedPoints' FIELD:
 - The content MUST be ONLY Markdown text.
-- Use standard Markdown for formatting (headings, paragraphs, lists, bold, italics). **Avoid placing asterisks or other Markdown characters randomly between words or in ways that break formatting.** Emphasize text correctly (e.g., \`**bold text**\`, \`*italic text*\`). Do NOT produce output like "word * word" or isolated asterisks.
+- Use standard Markdown for formatting (headings, paragraphs, lists, bold, italics). **Ensure asterisks or other Markdown characters are used correctly for emphasis (e.g., \`**bold text**\`, \`*italic text*\`) and are NOT placed randomly between words or in ways that break formatting (e.g., NO "word * word" or isolated asterisks).**
 - ABSOLUTELY NO JSON structures, keys (like "topic", "points", "point", "title", "summary"), or array-like syntax (square brackets, commas separating items as if in an array) should appear within the Markdown text.
 - The Markdown text should be a continuous flow of headings (##) and paragraphs.
 
@@ -106,27 +106,32 @@ const supplementRevisionPointsFlow = ai.defineFlow(
     outputSchema: SupplementRevisionPointsOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    if (!output || typeof output.supplementedPoints !== 'string') {
-      console.error("Invalid output from supplementRevisionPointsPrompt:", output);
-      return { supplementedPoints: "Error: Could not generate supplemented content correctly because the output was not a string or was missing." };
-    }
-    
-    let cleanedOutput = output.supplementedPoints;
-    // Attempt to remove problematic JSON-like fragments if the LLM still includes them.
-    cleanedOutput = cleanedOutput.replace(/,\s*"points":\s*\[{"point":/g, ''); 
-    cleanedOutput = cleanedOutput.replace(/\[{"topic":\s*".*?",\s*"points":\s*\[{"point":/g, '');
-    
-    // Attempt to clean up if the LLM wraps the response in a JSON structure for supplementedPoints
-    const match = cleanedOutput.match(/^\{\s*"supplementedPoints"\s*:\s*"(.*)"\s*\}$/s);
-    if (match && match[1]) {
-        cleanedOutput = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-    }
+    try {
+      const {output} = await prompt(input);
+      if (!output || typeof output.supplementedPoints !== 'string') {
+        console.error("Invalid output from supplementRevisionPointsPrompt:", output);
+        return { supplementedPoints: "## Erreur de Génération\n\nL'IA n'a pas pu générer le contenu supplémenté correctement car la sortie n'était pas une chaîne de caractères ou était manquante." };
+      }
+      
+      let cleanedOutput = output.supplementedPoints;
+      // Attempt to remove problematic JSON-like fragments if the LLM still includes them.
+      cleanedOutput = cleanedOutput.replace(/,\s*"points":\s*\[{"point":/g, ''); 
+      cleanedOutput = cleanedOutput.replace(/\[{"topic":\s*".*?",\s*"points":\s*\[{"point":/g, '');
+      
+      // Attempt to clean up if the LLM wraps the response in a JSON structure for supplementedPoints
+      const match = cleanedOutput.match(/^\{\s*"supplementedPoints"\s*:\s*"(.*)"\s*\}$/s);
+      if (match && match[1]) {
+          cleanedOutput = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      }
 
-    // Attempt to clean up stray asterisks surrounded by spaces, e.g. "word * word" -> "word word"
-    cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
+      // Attempt to clean up stray asterisks surrounded by spaces, e.g. "word * word" -> "word word"
+      cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
 
-    return { supplementedPoints: cleanedOutput };
+      return { supplementedPoints: cleanedOutput };
+    } catch (error: any) {
+      console.error("Error in supplementRevisionPointsFlow during AI call:", error);
+      // Return a structured error message that fits the schema
+      return { supplementedPoints: `## Erreur Interne du Système\n\nUne erreur est survenue lors de la communication avec le service d'IA pour supplémenter le contenu: ${error.message || 'Erreur inconnue'}\n\nVeuillez réessayer plus tard.` };
+    }
   }
 );
-
