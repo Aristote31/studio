@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UploadCloud, FileText, Languages, BookOpen, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, Languages, BookOpen, Loader2, FileImage } from 'lucide-react';
 import type { Language } from '@/types';
 import Image from 'next/image';
 
@@ -21,7 +21,7 @@ const formSchema = z.object({
   language: z.enum(['en', 'de', 'fr'], { errorMap: () => ({ message: "Veuillez sélectionner une langue." }) }),
   inputType: z.enum(['text', 'image']),
   textContent: z.string().optional(),
-  imageFile: z.any().optional(), // Using any for FileList
+  imageFiles: z.any().optional(), // Changed from z.instanceof(FileList) to z.any()
 }).superRefine((data, ctx) => {
   if (data.inputType === 'text' && (!data.textContent || data.textContent.trim().length < 10)) {
     ctx.addIssue({
@@ -30,11 +30,11 @@ const formSchema = z.object({
       message: "Le texte doit contenir au moins 10 caractères.",
     });
   }
-  if (data.inputType === 'image' && !data.imageFile) {
+  if (data.inputType === 'image' && (!data.imageFiles || data.imageFiles.length === 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['imageFile'],
-      message: "Veuillez télécharger une image.",
+      path: ['imageFiles'],
+      message: "Veuillez télécharger au moins une image.",
     });
   }
 });
@@ -42,12 +42,12 @@ const formSchema = z.object({
 type ContentInputFormValues = z.infer<typeof formSchema>;
 
 interface ContentInputProps {
-  onSubmit: (data: ContentInputFormValues, imageAsDataUrl?: string) => Promise<void>;
+  onSubmit: (data: ContentInputFormValues, imagesAsDataUrls?: string[]) => Promise<void>;
   isLoading: boolean;
 }
 
 export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [selectedInputType, setSelectedInputType] = useState<'text' | 'image'>('text');
 
   const { control, handleSubmit, register, setValue, watch, formState: { errors } } = useForm<ContentInputFormValues>({
@@ -63,31 +63,45 @@ export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
   const inputType = watch('inputType');
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setValue('imageFile', file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      setValue('imageFiles', files);
+      const newPreviews: string[] = [];
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push(reader.result as string);
+          // Only update previews once all files are read for simplicity in this example
+          // A more robust solution might update previews individually or show placeholders
+          if (newPreviews.length === files.length) {
+            setImagePreviews(newPreviews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     } else {
-      setValue('imageFile', undefined);
-      setImagePreview(null);
+      setValue('imageFiles', undefined);
+      setImagePreviews([]);
     }
   };
 
   const handleFormSubmit = async (data: ContentInputFormValues) => {
-    if (data.inputType === 'image' && data.imageFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onSubmit(data, reader.result as string);
-      };
-      reader.onerror = () => {
-        // Handle error, perhaps set an error state
-        console.error("Error reading file");
-      };
-      reader.readAsDataURL(data.imageFile as File);
+    if (data.inputType === 'image' && data.imageFiles && data.imageFiles.length > 0) {
+      const filePromises = Array.from(data.imageFiles).map(file => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+      try {
+        const imagesAsDataUrls = await Promise.all(filePromises);
+        onSubmit(data, imagesAsDataUrls);
+      } catch (error) {
+        console.error("Error reading files:", error);
+        // Handle error, perhaps set an error state or show a toast
+      }
     } else {
       onSubmit(data);
     }
@@ -97,8 +111,8 @@ export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
     setSelectedInputType(type);
     setValue('inputType', type);
     if (type === 'text') {
-        setValue('imageFile', undefined);
-        setImagePreview(null);
+        setValue('imageFiles', undefined);
+        setImagePreviews([]);
     } else {
         setValue('textContent', '');
     }
@@ -110,7 +124,7 @@ export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
       <CardHeader>
         <CardTitle className="text-3xl font-headline text-center text-primary">Créez Votre Fiche de Révision</CardTitle>
         <CardDescription className="text-center text-muted-foreground">
-          Entrez du texte ou téléchargez une image pour commencer.
+          Entrez du texte ou téléchargez une ou plusieurs images pour commencer.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -168,7 +182,7 @@ export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
               onClick={() => setInputType('image')}
               className="flex-1"
             >
-              <UploadCloud className="mr-2 h-4 w-4" /> Image
+              <UploadCloud className="mr-2 h-4 w-4" /> Image(s)
             </Button>
           </div>
           <Input type="hidden" {...register('inputType')} value={selectedInputType} />
@@ -190,20 +204,28 @@ export function ContentInputForm({ onSubmit, isLoading }: ContentInputProps) {
 
           {selectedInputType === 'image' && (
             <div className="space-y-2">
-              <Label htmlFor="imageFile" className="text-lg">Télécharger une Image</Label>
+              <Label htmlFor="imageFiles" className="text-lg">Télécharger Image(s)</Label>
               <Input 
-                id="imageFile" 
+                id="imageFiles" 
                 type="file" 
                 accept="image/png, image/jpeg, image/jpg" 
                 onChange={handleImageChange}
                 className="text-base"
+                multiple // Allow multiple files
               />
-              {imagePreview && (
-                <div className="mt-4 border border-dashed border-border p-4 rounded-md flex justify-center">
-                  <Image src={imagePreview} alt="Aperçu de l'image" width={300} height={200} className="max-w-full h-auto rounded-md shadow-md" data-ai-hint="user uploaded content" />
+              {imagePreviews.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4 border border-dashed border-border p-4 rounded-md">
+                  {imagePreviews.map((previewUrl, index) => (
+                    <div key={index} className="relative aspect-square">
+                       <Image src={previewUrl} alt={`Aperçu de l'image ${index + 1}`} layout="fill" objectFit="cover" className="rounded-md shadow-md" data-ai-hint="user uploaded content" />
+                    </div>
+                  ))}
                 </div>
               )}
-              {errors.imageFile && <p className="text-sm text-destructive">{errors.imageFile.message}</p>}
+              {imagePreviews.length === 0 && watch('imageFiles') && watch('imageFiles').length > 0 && (
+                 <p className="text-sm text-muted-foreground mt-2">{watch('imageFiles').length} image(s) sélectionnée(s).</p>
+              )}
+              {errors.imageFiles && <p className="text-sm text-destructive">{errors.imageFiles.message}</p>}
             </div>
           )}
 

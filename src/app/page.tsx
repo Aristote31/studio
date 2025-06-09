@@ -15,7 +15,7 @@ interface ContentInputFormValues {
   language: Language;
   inputType: 'text' | 'image';
   textContent?: string;
-  imageFile?: File;
+  imageFiles?: FileList; // Changed from imageFile to imageFiles
 }
 
 export default function RevisioPage() {
@@ -24,7 +24,6 @@ export default function RevisioPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Effect to clear error message after some time or on new action
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setError(null), 5000);
@@ -32,20 +31,20 @@ export default function RevisioPage() {
     }
   }, [error]);
 
-  const handleFormSubmit = async (formData: ContentInputFormValues, imageAsDataUrl?: string) => {
+  const handleFormSubmit = async (formData: ContentInputFormValues, imagesAsDataUrls?: string[]) => {
     setIsLoading(true);
     setError(null);
-    setRevisionData(null); // Clear previous data
+    setRevisionData(null);
 
     try {
       let extractionInput: ExtractRevisionPointsInput;
 
-      if (formData.inputType === 'image' && imageAsDataUrl) {
-        extractionInput = { imageDataUri: imageAsDataUrl, language: formData.language };
+      if (formData.inputType === 'image' && imagesAsDataUrls && imagesAsDataUrls.length > 0) {
+        extractionInput = { imageDataUris: imagesAsDataUrls, language: formData.language };
       } else if (formData.inputType === 'text' && formData.textContent) {
         extractionInput = { textContent: formData.textContent, language: formData.language };
       } else {
-        throw new Error("Contenu invalide. Veuillez fournir du texte ou une image.");
+        throw new Error("Contenu invalide. Veuillez fournir du texte ou au moins une image.");
       }
       
       toast({
@@ -59,7 +58,7 @@ export default function RevisioPage() {
       }
 
       const revisionPointsString = extractedOutput.revisionPoints
-        .map(p => `## ${p.title}`) // Simpler format for supplementation input
+        .map(p => `## ${p.title}`)
         .join('\n\n');
 
       const supplementationInput: SupplementRevisionPointsInput = {

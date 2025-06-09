@@ -13,11 +13,11 @@ import {z} from 'genkit';
 
 const ExtractRevisionPointsInputSchema = z.object({
   textContent: z.string().optional().describe('The text content to extract revision points from.'),
-  imageDataUri: z.string().optional().describe("A data URI of the image content to extract revision points from. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
+  imageDataUris: z.array(z.string()).optional().describe("A list of data URIs of the image content to extract revision points from. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   language: z.enum(['en', 'de', 'fr']).describe('The language of the revision sheet.'),
-}).refine(data => data.textContent || data.imageDataUri, {
-  message: "Either textContent or imageDataUri must be provided.",
-  path: ["textContent"], // Or path: ["imageDataUri"], path of the error
+}).refine(data => data.textContent || (data.imageDataUris && data.imageDataUris.length > 0), {
+  message: "Either textContent or at least one imageDataUri must be provided.",
+  path: ["textContent"], 
 });
 
 export type ExtractRevisionPointsInput = z.infer<typeof ExtractRevisionPointsInputSchema>;
@@ -50,9 +50,12 @@ const prompt = ai.definePrompt({
   {{{textContent}}}
   {{/if}}
 
-  {{#if imageDataUri}}
-  The content to analyze is the following image. Extract text, concepts, and key information visible in the image:
-  {{media url=imageDataUri}}
+  {{#if imageDataUris}}
+  The content to analyze are the following images. Extract text, concepts, and key information visible in them:
+  {{#each imageDataUris}}
+  Image {{add @index 1}}:
+  {{media url=this}}
+  {{/each}}
   {{/if}}
 
   Language for the output: {{language}}
@@ -60,6 +63,14 @@ const prompt = ai.definePrompt({
   Your output should be a list of revision points, where each point has a title and a short summary.
   Make sure the output is in the language: {{language}}.
   `,
+  customizers: [
+    (prompt) => {
+        prompt.handlebars.registerHelper('add', function (a, b) {
+            return a + b;
+        });
+        return prompt;
+    }
+  ]
 });
 
 const extractRevisionPointsFlow = ai.defineFlow(

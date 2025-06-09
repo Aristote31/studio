@@ -12,7 +12,7 @@ export interface RevisionSheetData {
 export interface ContentInput {
   inputType: 'text' | 'image';
   textContent: string;
-  imageFile?: File;
+  imageFiles?: FileList; // Changed from imageFile to imageFiles
   topic: string;
   language: Language;
 }
