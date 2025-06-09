@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 "use client";
 
@@ -15,7 +16,7 @@ interface ContentInputFormValues {
   language: Language;
   inputType: 'text' | 'image';
   textContent?: string;
-  imageFiles?: FileList; // Changed from imageFile to imageFiles
+  imageFiles?: FileList; 
 }
 
 export default function RevisioPage() {
@@ -40,7 +41,11 @@ export default function RevisioPage() {
       let extractionInput: ExtractRevisionPointsInput;
 
       if (formData.inputType === 'image' && imagesAsDataUrls && imagesAsDataUrls.length > 0) {
-        extractionInput = { imageDataUris: imagesAsDataUrls, language: formData.language };
+        const imageDataObjects = imagesAsDataUrls.map((url, index) => ({
+          url: url,
+          displayIndex: index + 1,
+        }));
+        extractionInput = { imageDataObjects: imageDataObjects, language: formData.language };
       } else if (formData.inputType === 'text' && formData.textContent) {
         extractionInput = { textContent: formData.textContent, language: formData.language };
       } else {

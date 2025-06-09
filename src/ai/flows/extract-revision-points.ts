@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -11,12 +12,17 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const ImageInputSchema = z.object({
+  url: z.string().describe("A data URI of the image content. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
+  displayIndex: z.number().describe("The 1-based index of the image for display purposes.")
+});
+
 const ExtractRevisionPointsInputSchema = z.object({
   textContent: z.string().optional().describe('The text content to extract revision points from.'),
-  imageDataUris: z.array(z.string()).optional().describe("A list of data URIs of the image content to extract revision points from. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
+  imageDataObjects: z.array(ImageInputSchema).optional().describe("A list of image objects, each containing a data URI and a display index."),
   language: z.enum(['en', 'de', 'fr']).describe('The language of the revision sheet.'),
-}).refine(data => data.textContent || (data.imageDataUris && data.imageDataUris.length > 0), {
-  message: "Either textContent or at least one imageDataUri must be provided.",
+}).refine(data => data.textContent || (data.imageDataObjects && data.imageDataObjects.length > 0), {
+  message: "Either textContent or at least one image must be provided.",
   path: ["textContent"], 
 });
 
@@ -50,11 +56,11 @@ const prompt = ai.definePrompt({
   {{{textContent}}}
   {{/if}}
 
-  {{#if imageDataUris}}
+  {{#if imageDataObjects}}
   The content to analyze are the following images. Extract text, concepts, and key information visible in them:
-  {{#each imageDataUris}}
-  Image {{add @index 1}}:
-  {{media url=this}}
+  {{#each imageDataObjects}}
+  Image {{this.displayIndex}}:
+  {{media url=this.url}}
   {{/each}}
   {{/if}}
 
@@ -63,14 +69,7 @@ const prompt = ai.definePrompt({
   Your output should be a list of revision points, where each point has a title and a short summary.
   Make sure the output is in the language: {{language}}.
   `,
-  customizers: [
-    (prompt) => {
-        prompt.handlebars.registerHelper('add', function (a, b) {
-            return a + b;
-        });
-        return prompt;
-    }
-  ]
+  // Removed customizers as the 'add' helper is no longer needed
 });
 
 const extractRevisionPointsFlow = ai.defineFlow(
