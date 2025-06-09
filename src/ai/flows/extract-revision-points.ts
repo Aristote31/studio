@@ -69,7 +69,6 @@ const prompt = ai.definePrompt({
   Your output should be a list of revision points, where each point has a title and a short summary.
   Make sure the output is in the language: {{language}}.
   `,
-  // Removed customizers as the 'add' helper is no longer needed
 });
 
 const extractRevisionPointsFlow = ai.defineFlow(
@@ -79,7 +78,43 @@ const extractRevisionPointsFlow = ai.defineFlow(
     outputSchema: ExtractRevisionPointsOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    try {
+      const {output} = await prompt(input);
+      if (!output || !output.revisionPoints) {
+        console.error("Invalid or missing revisionPoints in output from extractRevisionPointsPrompt:", output);
+        
+        let errorTitle = "Erreur d'Extraction";
+        let errorSummary = "L'IA n'a pas pu retourner de points de révision valides.";
+        if (input.language === 'en') {
+            errorTitle = "Extraction Error";
+            errorSummary = "The AI could not return valid revision points.";
+        } else if (input.language === 'de') {
+            errorTitle = "Extraktionsfehler";
+            errorSummary = "Die KI konnte keine gültigen Revisionspunkte zurückgeben.";
+        }
+        return { revisionPoints: [{ title: errorTitle, summary: errorSummary }] };
+      }
+      return output!;
+    } catch (error: any) {
+      console.error("Error in extractRevisionPointsFlow during AI call:", error);
+      
+      let errorTitle = "Erreur d'Extraction";
+      let errorSummary = "Une erreur est survenue lors de l'extraction des points de révision.";
+      if (input.language === 'en') {
+        errorTitle = "Extraction Error";
+        errorSummary = "An error occurred while extracting revision points.";
+      } else if (input.language === 'de') {
+        errorTitle = "Extraktionsfehler";
+        errorSummary = "Beim Extrahieren der Revisionspunkte ist ein Fehler aufgetreten.";
+      }
+      
+      return { 
+        revisionPoints: [{ 
+          title: errorTitle, 
+          summary: `${errorSummary} ${error.message || 'Erreur inconnue.'}`
+        }] 
+      };
+    }
   }
 );
+
