@@ -38,6 +38,7 @@ export type SupplementRevisionPointsOutput = z.infer<
 export async function supplementRevisionPoints(
   input: SupplementRevisionPointsInput
 ): Promise<SupplementRevisionPointsOutput> {
+  console.log('supplementRevisionPoints flow invoked with input:', JSON.stringify(input, null, 2));
   return supplementRevisionPointsFlow(input);
 }
 
@@ -113,10 +114,12 @@ const supplementRevisionPointsFlow = ai.defineFlow(
   },
   async input => {
     try {
+      console.log('Attempting to call supplementRevisionPointsPrompt with input:', JSON.stringify(input, null, 2));
       const {output} = await prompt(input);
       if (!output || typeof output.supplementedPoints !== 'string') {
-        console.error("Invalid output from supplementRevisionPointsPrompt:", output);
-        return { supplementedPoints: "## Erreur de Génération\n\nL'IA n'a pas pu générer le contenu supplémenté correctement car la sortie n'était pas une chaîne de caractères ou était manquante." };
+        const errorMsg = "Invalid output from supplementRevisionPointsPrompt: output is not a string or is missing.";
+        console.error(errorMsg, "Output received:", output);
+        return { supplementedPoints: `## Erreur de Génération\n\n${errorMsg} (Output was: ${JSON.stringify(output)})` };
       }
       
       let cleanedOutput = output.supplementedPoints;
@@ -124,20 +127,17 @@ const supplementRevisionPointsFlow = ai.defineFlow(
       cleanedOutput = cleanedOutput.replace(/,\s*"points":\s*\[{"point":/g, ''); 
       cleanedOutput = cleanedOutput.replace(/\[{"topic":\s*".*?",\s*"points":\s*\[{"point":/g, '');
       
-      // Attempt to clean up if the LLM wraps the response in a JSON structure for supplementedPoints
       const match = cleanedOutput.match(/^\{\s*"supplementedPoints"\s*:\s*"(.*)"\s*\}$/s);
       if (match && match[1]) {
           cleanedOutput = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
       }
-
-      // Removed simplistic asterisk cleanup: cleanedOutput = cleanedOutput.replace(/\s\*\s/g, ' ');
-      // Relying on improved prompt for correct Markdown generation.
-
+      console.log('supplementRevisionPointsPrompt call successful.');
       return { supplementedPoints: cleanedOutput };
     } catch (error: any) {
-      console.error("Error in supplementRevisionPointsFlow during AI call:", error);
-      // Return a structured error message that fits the schema
-      return { supplementedPoints: `## Erreur Interne du Système\n\nUne erreur est survenue lors de la communication avec le service d'IA pour supplémenter le contenu: ${error.message || 'Erreur inconnue'}\n\nVeuillez réessayer plus tard.` };
+      console.error("Error in supplementRevisionPointsFlow during AI call. Input was:", JSON.stringify(input, null, 2));
+      console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      
+      return { supplementedPoints: `## Erreur Interne Critique du Système\n\nUne erreur critique est survenue lors de la communication avec le service d'IA pour supplémenter le contenu: ${error.message || 'Erreur inconnue'}\n\nVeuillez vérifier les logs du serveur et réessayer plus tard.` };
     }
   }
 );

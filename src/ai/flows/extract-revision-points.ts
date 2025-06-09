@@ -39,6 +39,7 @@ const ExtractRevisionPointsOutputSchema = z.object({
 export type ExtractRevisionPointsOutput = z.infer<typeof ExtractRevisionPointsOutputSchema>;
 
 export async function extractRevisionPoints(input: ExtractRevisionPointsInput): Promise<ExtractRevisionPointsOutput> {
+  console.log('extractRevisionPoints flow invoked with input:', JSON.stringify(input, null, 2));
   return extractRevisionPointsFlow(input);
 }
 
@@ -79,9 +80,11 @@ const extractRevisionPointsFlow = ai.defineFlow(
   },
   async input => {
     try {
+      console.log('Attempting to call extractRevisionPointsPrompt with input:', JSON.stringify(input, null, 2));
       const {output} = await prompt(input);
       if (!output || !output.revisionPoints) {
-        console.error("Invalid or missing revisionPoints in output from extractRevisionPointsPrompt:", output);
+        const errorMsg = "Invalid or missing revisionPoints in output from extractRevisionPointsPrompt.";
+        console.error(errorMsg, "Output received:", output);
         
         let errorTitle = "Erreur d'Extraction";
         let errorSummary = "L'IA n'a pas pu retourner de points de révision valides.";
@@ -92,29 +95,30 @@ const extractRevisionPointsFlow = ai.defineFlow(
             errorTitle = "Extraktionsfehler";
             errorSummary = "Die KI konnte keine gültigen Revisionspunkte zurückgeben.";
         }
-        return { revisionPoints: [{ title: errorTitle, summary: errorSummary }] };
+        return { revisionPoints: [{ title: errorTitle, summary: `${errorSummary} (Output was: ${JSON.stringify(output)})` }] };
       }
+      console.log('extractRevisionPointsPrompt call successful.');
       return output!;
     } catch (error: any) {
-      console.error("Error in extractRevisionPointsFlow during AI call:", error);
+      console.error("Error in extractRevisionPointsFlow during AI call. Input was:", JSON.stringify(input, null, 2));
+      console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       
-      let errorTitle = "Erreur d'Extraction";
-      let errorSummary = "Une erreur est survenue lors de l'extraction des points de révision.";
+      let errorTitle = "Erreur d'Extraction Critique";
+      let errorSummary = "Une erreur critique est survenue lors de l'extraction des points de révision.";
       if (input.language === 'en') {
-        errorTitle = "Extraction Error";
-        errorSummary = "An error occurred while extracting revision points.";
+        errorTitle = "Critical Extraction Error";
+        errorSummary = "A critical error occurred while extracting revision points.";
       } else if (input.language === 'de') {
-        errorTitle = "Extraktionsfehler";
-        errorSummary = "Beim Extrahieren der Revisionspunkte ist ein Fehler aufgetreten.";
+        errorTitle = "Kritischer Extraktionsfehler";
+        errorSummary = "Beim Extrahieren der Revisionspunkte ist ein kritischer Fehler aufgetreten.";
       }
       
       return { 
         revisionPoints: [{ 
           title: errorTitle, 
-          summary: `${errorSummary} ${error.message || 'Erreur inconnue.'}`
+          summary: `${errorSummary} Détails: ${error.message || 'Erreur inconnue.'}. Veuillez vérifier les logs du serveur.`
         }] 
       };
     }
   }
 );
-
